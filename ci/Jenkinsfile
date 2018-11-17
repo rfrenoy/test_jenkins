@@ -4,7 +4,7 @@ pipeline {
         pollSCM('*/30 * * * *')
     }
     // Keep the 10 most recent builds
-    buildDiscarder(logRotator(numToKeepStr: '10'))
+    options { buildDiscarder(logRotator(numToKeepStr: '10')) }
 
     stages {
         stage('Code pull') {
@@ -12,28 +12,66 @@ pipeline {
                 checkout scm
             }
         }
-        stage('Unit test') {
-            agent {
-                dockerfile {
-                        filename 'Dockerfile'
-                        dir 'ci'
-                        additionalBuildArgs  '--build-arg PYTHON_VERSION=2.7'
+        stage('Tests') {
+            parallel {
+                stage('Tests on Python 2.7') {
+                    agent {
+                        dockerfile {
+                            filename 'ci/Dockerfile'
+                            additionalBuildArgs  '--build-arg PYTHON_VERSION=2.7'
+                        }
+                    }
+                    stages {
+                        stage('Unit test') {
+                            steps {
+                                sh 'make unittests'
+                            }
+                        }
+                    }
+                    post {
+                        success {
+                            publishHTML target: [
+                                allowMissing: false,
+                                alwaysLinkToLastBuild: false,
+                                keepAll: true,
+                                reportDir: 'cover',
+                                reportFiles: 'index.html',
+                                reportName: 'Coverage report Python 2.7'
+                            ]
+                        }
+                    }
                 }
-            }
-            steps {
-                make unittests
-            }
-            post {
-                success {
-                    echo 'all tests went successfully'
+                stage('Tests on Python 3.6') {
+                    agent {
+                        dockerfile {
+                            filename 'ci/Dockerfile'
+                            additionalBuildArgs  '--build-arg PYTHON_VERSION=3.6'
+                        }
+                    }
+                    stages {
+                        stage('Unit test') {
+                            steps {
+                                sh 'make unittests'
+                            }
+                        }
+                    }
+                    post {
+                        success {
+                            publishHTML target: [
+                                allowMissing: false,
+                                alwaysLinkToLastBuild: false,
+                                keepAll: true,
+                                reportDir: 'cover',
+                                reportFiles: 'index.html',
+                                reportName: 'Coverage report Python 3.6'
+                            ]
+                        }
+                    }
                 }
             }
         }
     }
     post {
-        success {
-            echo 'all process went successfully'
-        }
         failure {
             echo 'Something went wrong'
         }
