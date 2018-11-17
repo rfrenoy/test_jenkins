@@ -1,0 +1,41 @@
+pipeline {
+    agent any
+    triggers {
+        pollSCM('*/30 * * * *')
+    }
+    // Keep the 10 most recent builds
+    buildDiscarder(logRotator(numToKeepStr: '10'))
+
+    stages {
+        stage('Code pull') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Unit test') {
+            agent {
+                dockerfile {
+                        filename 'Dockerfile'
+                        dir 'ci'
+                        additionalBuildArgs  '--build-arg PYTHON_VERSION=2.7'
+                }
+            }
+            steps {
+                make unittests
+            }
+            post {
+                success {
+                    echo 'all tests went successfully'
+                }
+            }
+        }
+    }
+    post {
+        success {
+            echo 'all process went successfully'
+        }
+        failure {
+            echo 'Something went wrong'
+        }
+    }
+}
